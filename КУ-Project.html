@@ -1,0 +1,853 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Долгота дня — Каменск-Уральский</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;700;900&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night:   #0a0c1a;
+    --deep:    #0f1328;
+    --morn:    #ff6b35;
+    --day:     #f9c846;
+    --eve:     #7b5ea7;
+    --sky:     #4fc3f7;
+    --text:    #e8eaf0;
+    --muted:   #6b7280;
+    --card:    rgba(255,255,255,0.04);
+    --border:  rgba(255,255,255,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--night);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Sky gradient background that changes with time of day */
+  .sky-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse at 50% -10%, #1a1f4e 0%, #0a0c1a 60%);
+    transition: background 2s ease;
+  }
+  .sky-bg.morning  { background: radial-gradient(ellipse at 30% 20%, #ff6b35 0%, #2a1520 40%, #0a0c1a 70%); }
+  .sky-bg.day      { background: radial-gradient(ellipse at 50% 0%, #1565c0 0%, #0d47a1 30%, #0a0c1a 70%); }
+  .sky-bg.evening  { background: radial-gradient(ellipse at 70% 20%, #7b5ea7 0%, #2d1b4e 40%, #0a0c1a 70%); }
+  .sky-bg.night    { background: radial-gradient(ellipse at 50% -10%, #1a1f4e 0%, #0a0c1a 60%); }
+
+  /* Stars */
+  .stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .star {
+    position: absolute; border-radius: 50%;
+    background: #fff; animation: twinkle var(--d) ease-in-out infinite alternate;
+  }
+  @keyframes twinkle { from { opacity: 0.1; } to { opacity: 0.9; } }
+
+  .wrap { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 2rem 1.2rem 4rem; }
+
+  /* Header */
+  header { text-align: center; margin-bottom: 2.5rem; }
+  .city-label {
+    font-family: 'Unbounded', sans-serif;
+    font-size: clamp(0.65rem, 1.5vw, 0.8rem);
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  h1 {
+    font-family: 'Unbounded', sans-serif;
+    font-size: clamp(1.4rem, 4vw, 2.4rem);
+    font-weight: 900;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #f9c846, #ff6b35, #7b5ea7);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 0.4rem;
+  }
+  .subtitle {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* Live clock */
+  .live-clock {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .clock-time {
+    font-family: 'Unbounded', sans-serif;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .clock-date { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; letter-spacing: 0.1em; }
+  .period-badge {
+    display: inline-block;
+    margin-top: 0.6rem;
+    padding: 0.25em 1em;
+    border-radius: 999px;
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .badge-morning { background: rgba(255,107,53,0.2); color: var(--morn); border: 1px solid rgba(255,107,53,0.4); }
+  .badge-day     { background: rgba(249,200,70,0.15); color: var(--day);  border: 1px solid rgba(249,200,70,0.35); }
+  .badge-evening { background: rgba(123,94,167,0.2);  color: #c39bd3;     border: 1px solid rgba(123,94,167,0.4); }
+  .badge-night   { background: rgba(79,195,247,0.1);  color: var(--sky);  border: 1px solid rgba(79,195,247,0.25); }
+
+  /* Controls */
+  .controls {
+    display: flex; gap: 0.8rem; justify-content: center; flex-wrap: wrap;
+    margin-bottom: 2rem;
+  }
+  .ctrl-group { display: flex; align-items: center; gap: 0.5rem; }
+  .ctrl-group label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  select {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5em 1em;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  select:focus { border-color: rgba(249,200,70,0.5); }
+  select option { background: #1a1d30; }
+
+  .btn {
+    background: linear-gradient(135deg, rgba(249,200,70,0.15), rgba(255,107,53,0.1));
+    border: 1px solid rgba(249,200,70,0.3);
+    color: var(--day);
+    padding: 0.5em 1.2em;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .btn:hover { background: rgba(249,200,70,0.2); border-color: rgba(249,200,70,0.5); }
+  .btn:active { transform: scale(0.97); }
+
+  /* Today card */
+  .today-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    text-align: center;
+  }
+  .today-stat-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.3rem; }
+  .today-stat-val {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+  .today-stat-val.sunrise { color: var(--morn); }
+  .today-stat-val.daylen  { color: var(--day); }
+  .today-stat-val.sunset  { color: var(--eve); }
+  .today-stat-val.night   { color: var(--sky); }
+
+  /* Day-arc progress */
+  .arc-wrap { margin-bottom: 1.5rem; }
+  .arc-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; text-align: center; margin-bottom: 0.6rem; }
+  .arc-track {
+    position: relative;
+    height: 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .arc-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--morn), var(--day), var(--eve));
+    transition: width 0.8s ease;
+  }
+  .arc-sun {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 18px; height: 18px;
+    background: var(--day);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--day);
+    transition: left 0.8s ease;
+    font-size: 10px; display: flex; align-items: center; justify-content: center;
+  }
+  .arc-ticks {
+    display: flex; justify-content: space-between;
+    margin-top: 0.3rem;
+    font-size: 0.6rem; color: var(--muted);
+  }
+
+  /* Calendar grid */
+  .month-section { margin-bottom: 2rem; }
+  .month-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    color: var(--day);
+    text-align: center;
+  }
+
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+  }
+  .cal-head {
+    text-align: center;
+    font-size: 0.6rem;
+    color: var(--muted);
+    padding: 0.3rem 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .cal-day {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.4rem 0.2rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-height: 70px;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 2px;
+  }
+  .cal-day.empty { background: transparent; border-color: transparent; cursor: default; }
+  .cal-day.today { border-color: rgba(249,200,70,0.6); box-shadow: 0 0 10px rgba(249,200,70,0.15); }
+  .cal-day.selected { border-color: rgba(255,107,53,0.7); background: rgba(255,107,53,0.1); }
+  .cal-day:not(.empty):hover { border-color: rgba(249,200,70,0.4); background: rgba(255,255,255,0.06); }
+  .cal-num {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+  .today .cal-num { color: var(--day); }
+  .cal-len { font-size: 0.55rem; color: var(--day); }
+  .cal-sr  { font-size: 0.5rem;  color: var(--morn); }
+  .cal-ss  { font-size: 0.5rem;  color: #c39bd3; }
+  .cal-bar {
+    width: 80%;
+    height: 3px;
+    border-radius: 2px;
+    margin-top: 2px;
+    background: linear-gradient(90deg, var(--morn), var(--day));
+    opacity: 0.7;
+  }
+
+  /* Periods bar chart */
+  .periods-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+  .period-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+  .period-card .p-icon { font-size: 1.4rem; margin-bottom: 0.3rem; }
+  .period-card .p-name {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+  }
+  .period-card .p-range { font-size: 0.62rem; color: var(--muted); margin-bottom: 0.5rem; }
+  .period-card .p-dur { font-size: 1.1rem; font-weight: 600; }
+  .p-morning .p-name, .p-morning .p-dur { color: var(--morn); }
+  .p-day     .p-name, .p-day     .p-dur { color: var(--day); }
+  .p-evening .p-name, .p-evening .p-dur { color: #c39bd3; }
+  .p-night   .p-name, .p-night   .p-dur { color: var(--sky); }
+
+  /* Tooltip */
+  .tooltip {
+    display: none;
+    position: fixed; z-index: 100;
+    background: #1a1d30;
+    border: 1px solid rgba(249,200,70,0.3);
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    font-size: 0.72rem;
+    pointer-events: none;
+    min-width: 160px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .tooltip.visible { display: block; }
+  .tooltip-date { font-family: 'Unbounded', sans-serif; font-size: 0.65rem; color: var(--day); margin-bottom: 0.4rem; }
+  .tooltip-row { display: flex; justify-content: space-between; gap: 1rem; margin-bottom: 0.15rem; color: var(--muted); }
+  .tooltip-row span:last-child { color: var(--text); }
+
+  /* Chart */
+  .chart-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.2rem;
+    margin-bottom: 1.5rem;
+  }
+  .chart-title {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+  canvas { display: block; width: 100%; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    font-size: 0.62rem;
+    color: var(--muted);
+    margin-top: 3rem;
+    letter-spacing: 0.08em;
+  }
+
+  @media (max-width: 480px) {
+    .periods-grid { grid-template-columns: repeat(2, 1fr); }
+    .today-card { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="sky-bg" id="skyBg"></div>
+<div class="stars" id="stars"></div>
+
+<div class="wrap">
+  <header>
+    <div class="city-label">📍 Каменск-Уральский · Свердловская обл.</div>
+    <h1>Долгота дня</h1>
+    <div class="subtitle">Екатеринбургское время · UTC+5 · 56.41°N 61.92°E</div>
+  </header>
+
+  <!-- Live clock -->
+  <div class="live-clock">
+    <div class="clock-time" id="clockTime">--:--:--</div>
+    <div class="clock-date" id="clockDate"></div>
+    <div id="periodBadge" class="period-badge badge-night">🌙 Ночь</div>
+  </div>
+
+  <!-- Sun arc for today -->
+  <div class="arc-wrap">
+    <div class="arc-label">Дуга солнца сегодня</div>
+    <div class="arc-track" id="arcTrack">
+      <div class="arc-fill" id="arcFill" style="width:0%"></div>
+      <div class="arc-sun" id="arcSun" style="left:0%">☀</div>
+    </div>
+    <div class="arc-ticks">
+      <span id="arcSR">↑</span>
+      <span>12:00</span>
+      <span id="arcSS">↓</span>
+    </div>
+  </div>
+
+  <!-- Today stats -->
+  <div class="today-card" id="todayCard">
+    <div>
+      <div class="today-stat-label">🌅 Восход</div>
+      <div class="today-stat-val sunrise" id="todaySR">--:--</div>
+    </div>
+    <div>
+      <div class="today-stat-label">☀️ Долгота дня</div>
+      <div class="today-stat-val daylen" id="todayLen">--ч --м</div>
+    </div>
+    <div>
+      <div class="today-stat-label">🌇 Закат</div>
+      <div class="today-stat-val sunset" id="todaySS">--:--</div>
+    </div>
+    <div>
+      <div class="today-stat-label">🌙 Тёмное время</div>
+      <div class="today-stat-val night" id="todayNight">--ч --м</div>
+    </div>
+  </div>
+
+  <!-- Periods breakdown -->
+  <div class="periods-grid" id="periodsGrid">
+    <div class="period-card p-morning">
+      <div class="p-icon">🌅</div>
+      <div class="p-name">Утро</div>
+      <div class="p-range">06:00 – 12:00</div>
+      <div class="p-dur" id="p_morning">--ч --м</div>
+    </div>
+    <div class="period-card p-day">
+      <div class="p-icon">☀️</div>
+      <div class="p-name">День</div>
+      <div class="p-range">12:00 – 18:00</div>
+      <div class="p-dur" id="p_day">--ч --м</div>
+    </div>
+    <div class="period-card p-evening">
+      <div class="p-icon">🌆</div>
+      <div class="p-name">Вечер</div>
+      <div class="p-range">18:00 – 00:00</div>
+      <div class="p-dur" id="p_evening">--ч --м</div>
+    </div>
+    <div class="period-card p-night">
+      <div class="p-icon">🌙</div>
+      <div class="p-name">Ночь</div>
+      <div class="p-range">00:00 – 06:00</div>
+      <div class="p-dur" id="p_night">--ч --м</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>Месяц</label>
+      <select id="selMonth">
+        <option value="0">Январь</option><option value="1">Февраль</option>
+        <option value="2">Март</option><option value="3">Апрель</option>
+        <option value="4">Май</option><option value="5">Июнь</option>
+        <option value="6">Июль</option><option value="7">Август</option>
+        <option value="8">Сентябрь</option><option value="9">Октябрь</option>
+        <option value="10">Ноябрь</option><option value="11">Декабрь</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>Год</label>
+      <select id="selYear"></select>
+    </div>
+    <button class="btn" id="btnCal">📅 Текущая дата</button>
+  </div>
+
+  <!-- Month section -->
+  <div class="month-section">
+    <div class="month-title" id="monthTitle"></div>
+
+    <!-- Chart -->
+    <div class="chart-wrap">
+      <div class="chart-title">Долгота дня по дням месяца</div>
+      <canvas id="chart" height="120"></canvas>
+    </div>
+
+    <!-- Calendar grid -->
+    <div class="calendar-grid" id="calGrid">
+      <div class="cal-head">Пн</div>
+      <div class="cal-head">Вт</div>
+      <div class="cal-head">Ср</div>
+      <div class="cal-head">Чт</div>
+      <div class="cal-head">Пт</div>
+      <div class="cal-head">Сб</div>
+      <div class="cal-head">Вс</div>
+    </div>
+  </div>
+
+  <footer>
+    Координаты: 56°24′N 61°55′E · Часовой пояс: Asia/Yekaterinburg (UTC+5)<br>
+    Расчёты по астрономическим формулам NOAA · Обновляется в реальном времени
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ---- CONSTANTS ----
+const LAT = 56.4142, LON = 61.9244, TZ_OFFSET = 5; // UTC+5 Ekaterinburg
+const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                   'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня',
+                    'июля','августа','сентября','октября','ноября','декабря'];
+
+// ---- STARS ----
+(function createStars() {
+  const container = document.getElementById('stars');
+  for (let i = 0; i < 120; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const sz = Math.random() * 2 + 0.5;
+    s.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      top:${Math.random()*100}%;
+      left:${Math.random()*100}%;
+      --d:${(Math.random()*3+1).toFixed(1)}s;
+      animation-delay:${(Math.random()*3).toFixed(1)}s;
+    `;
+    container.appendChild(s);
+  }
+})();
+
+// ---- SUN CALC (NOAA algorithm) ----
+function julianDay(year, month, day) {
+  if (month <= 2) { year -= 1; month += 12; }
+  const A = Math.floor(year / 100);
+  const B = 2 - A + Math.floor(A / 4);
+  return Math.floor(365.25 * (year + 4716)) + Math.floor(30.6001 * (month + 1)) + day + B - 1524.5;
+}
+
+function sunCalc(year, month, day) {
+  // month is 1-based
+  const jd = julianDay(year, month, day);
+  const jc = (jd - 2451545) / 36525;
+
+  const geomMeanLong = (280.46646 + jc * (36000.76983 + jc * 0.0003032)) % 360;
+  const geomMeanAnom = 357.52911 + jc * (35999.05029 - 0.0001537 * jc);
+  const eccentEarth = 0.016708634 - jc * (0.000042037 + 0.0000001267 * jc);
+  const sunEqCenter = Math.sin(toRad(geomMeanAnom)) * (1.914602 - jc * (0.004817 + 0.000014 * jc))
+    + Math.sin(toRad(2 * geomMeanAnom)) * (0.019993 - 0.000101 * jc)
+    + Math.sin(toRad(3 * geomMeanAnom)) * 0.000289;
+
+  const sunTrueLong = geomMeanLong + sunEqCenter;
+  const sunAppLong = sunTrueLong - 0.00569 - 0.00478 * Math.sin(toRad(125.04 - 1934.136 * jc));
+
+  const meanObliq = 23 + (26 + (21.448 - jc * (46.8150 + jc * (0.00059 - jc * 0.001813))) / 60) / 60;
+  const obliqCorr = meanObliq + 0.00256 * Math.cos(toRad(125.04 - 1934.136 * jc));
+
+  const sunDeclin = toDeg(Math.asin(Math.sin(toRad(obliqCorr)) * Math.sin(toRad(sunAppLong))));
+  const y = Math.tan(toRad(obliqCorr / 2)) ** 2;
+
+  const eqTime = 4 * toDeg(
+    y * Math.sin(2 * toRad(geomMeanLong))
+    - 2 * eccentEarth * Math.sin(toRad(geomMeanAnom))
+    + 4 * eccentEarth * y * Math.sin(toRad(geomMeanAnom)) * Math.cos(2 * toRad(geomMeanLong))
+    - 0.5 * y * y * Math.sin(4 * toRad(geomMeanLong))
+    - 1.25 * eccentEarth * eccentEarth * Math.sin(2 * toRad(geomMeanAnom))
+  );
+
+  const haSunrise = toDeg(Math.acos(
+    Math.cos(toRad(90.833)) / (Math.cos(toRad(LAT)) * Math.cos(toRad(sunDeclin)))
+    - Math.tan(toRad(LAT)) * Math.tan(toRad(sunDeclin))
+  ));
+
+  if (isNaN(haSunrise)) {
+    // polar day or night
+    const noon = (720 - 4 * LON - eqTime) / 60 + TZ_OFFSET;
+    if (sunDeclin * LAT > 0) return { sr: 0, ss: 24, noon, dayLen: 24 * 60, polar: 'day' };
+    return { sr: 12, ss: 12, noon, dayLen: 0, polar: 'night' };
+  }
+
+  const solarNoon = (720 - 4 * LON - eqTime) / 60 + TZ_OFFSET; // hours
+  const sunriseH = solarNoon - haSunrise * 4 / 60;
+  const sunsetH  = solarNoon + haSunrise * 4 / 60;
+  const dayLen   = (sunsetH - sunriseH) * 60; // minutes
+
+  return { sr: sunriseH, ss: sunsetH, noon: solarNoon, dayLen, polar: null };
+}
+
+function toRad(d) { return d * Math.PI / 180; }
+function toDeg(r) { return r * 180 / Math.PI; }
+
+function fmtTime(h) {
+  if (h < 0) h += 24;
+  if (h >= 24) h -= 24;
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+
+function fmtDuration(minutes) {
+  const h = Math.floor(Math.abs(minutes) / 60);
+  const m = Math.round(Math.abs(minutes) % 60);
+  return `${h}ч ${String(m).padStart(2,'0')}м`;
+}
+
+// ---- EKATERINBURG TIME ----
+function ekatNow() {
+  const now = new Date();
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  return new Date(utcMs + TZ_OFFSET * 3600000);
+}
+
+// ---- PERIODS ----
+function getPeriods(sr, ss) {
+  // Periods: morning 6-12, day 12-18, evening 18-24, night 0-6
+  // Calculate overlap of sunlit time with each period
+  function overlap(a1, a2, b1, b2) {
+    return Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
+  }
+  const lit = (sr < ss) ? [[sr, ss]] : (sr > 0 ? [[sr, 24], [0, ss]] : [[0, ss]]);
+  function lightInRange(b1, b2) {
+    return lit.reduce((s, [a1, a2]) => s + overlap(a1, a2, b1, b2), 0) * 60;
+  }
+  return {
+    morning: lightInRange(6, 12),
+    day:     lightInRange(12, 18),
+    evening: lightInRange(18, 24),
+    night:   lightInRange(0, 6)
+  };
+}
+
+// ---- CLOCK ----
+function updateClock() {
+  const now = ekatNow();
+  const h = now.getHours(), m = now.getMinutes(), s = now.getSeconds();
+  document.getElementById('clockTime').textContent =
+    `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  document.getElementById('clockDate').textContent =
+    `${now.getDate()} ${MONTHS_GEN[now.getMonth()]} ${now.getFullYear()}`;
+
+  const hDec = h + m / 60 + s / 3600;
+  let period, cls, icon;
+  if (hDec >= 6 && hDec < 12)  { period = 'Утро';   cls = 'badge-morning'; icon = '🌅'; }
+  else if (hDec >= 12 && hDec < 18) { period = 'День';  cls = 'badge-day';     icon = '☀️'; }
+  else if (hDec >= 18 && hDec < 24) { period = 'Вечер'; cls = 'badge-evening'; icon = '🌆'; }
+  else                               { period = 'Ночь';  cls = 'badge-night';   icon = '🌙'; }
+
+  const badge = document.getElementById('periodBadge');
+  badge.textContent = `${icon} ${period}`;
+  badge.className = `period-badge ${cls}`;
+
+  // Sky bg
+  const sky = document.getElementById('skyBg');
+  sky.className = 'sky-bg ' + (
+    hDec >= 6 && hDec < 12 ? 'morning' :
+    hDec >= 12 && hDec < 18 ? 'day' :
+    hDec >= 18 && hDec < 24 ? 'evening' : 'night'
+  );
+
+  // Update arc for today
+  updateArc(now);
+}
+
+function updateArc(now) {
+  const sc = sunCalc(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  if (sc.polar) return;
+  const h = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
+  const pct = Math.min(100, Math.max(0, ((h - sc.sr) / (sc.ss - sc.sr)) * 100));
+  document.getElementById('arcFill').style.width = pct + '%';
+  document.getElementById('arcSun').style.left = pct + '%';
+}
+
+// ---- TODAY STATS ----
+function updateTodayStats() {
+  const now = ekatNow();
+  const sc = sunCalc(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  document.getElementById('todaySR').textContent = fmtTime(sc.sr);
+  document.getElementById('todaySS').textContent = fmtTime(sc.ss);
+  document.getElementById('todayLen').textContent = fmtDuration(sc.dayLen);
+  document.getElementById('todayNight').textContent = fmtDuration(1440 - sc.dayLen);
+  document.getElementById('arcSR').textContent = '↑ ' + fmtTime(sc.sr);
+  document.getElementById('arcSS').textContent = fmtTime(sc.ss) + ' ↓';
+
+  const p = getPeriods(sc.sr, sc.ss);
+  document.getElementById('p_morning').textContent = fmtDuration(p.morning);
+  document.getElementById('p_day').textContent     = fmtDuration(p.day);
+  document.getElementById('p_evening').textContent = fmtDuration(p.evening);
+  document.getElementById('p_night').textContent   = fmtDuration(p.night);
+}
+
+// ---- CALENDAR ----
+let selYear, selMonth;
+
+function buildSelectors() {
+  const sy = document.getElementById('selYear');
+  const now = ekatNow();
+  for (let y = 2000; y <= 2100; y++) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    if (y === 2026) o.selected = true;
+    sy.appendChild(o);
+  }
+  document.getElementById('selMonth').value = now.getMonth();
+  sy.value = now.getFullYear();
+  selMonth = now.getMonth();
+  selYear = now.getFullYear();
+}
+
+function renderMonth(year, month) {
+  selYear = year; selMonth = month;
+  document.getElementById('monthTitle').textContent =
+    `${MONTHS_RU[month]} ${year}`;
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const data = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    data.push({ d, ...sunCalc(year, month + 1, d) });
+  }
+
+  renderChart(data, year, month);
+  renderCalendar(data, year, month);
+}
+
+// ---- CHART ----
+function renderChart(data, year, month) {
+  const canvas = document.getElementById('chart');
+  const W = canvas.offsetWidth || 800, H = 120;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const maxH = Math.max(...data.map(d => d.dayLen));
+  const minH = Math.min(...data.map(d => d.dayLen));
+  const pad = { t: 10, b: 20, l: 8, r: 8 };
+
+  const xStep = (W - pad.l - pad.r) / (data.length - 1);
+  function xOf(i)  { return pad.l + i * xStep; }
+  function yOf(v)  {
+    const range = maxH - minH || 1;
+    return H - pad.b - ((v - minH) / range) * (H - pad.t - pad.b);
+  }
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, W, 0);
+  grad.addColorStop(0, 'rgba(255,107,53,0.5)');
+  grad.addColorStop(0.5, 'rgba(249,200,70,0.5)');
+  grad.addColorStop(1, 'rgba(123,94,167,0.5)');
+
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), H - pad.b);
+  data.forEach((d, i) => ctx.lineTo(xOf(i), yOf(d.dayLen)));
+  ctx.lineTo(xOf(data.length - 1), H - pad.b);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  data.forEach((d, i) => {
+    if (i === 0) ctx.moveTo(xOf(i), yOf(d.dayLen));
+    else ctx.lineTo(xOf(i), yOf(d.dayLen));
+  });
+  ctx.strokeStyle = '#f9c846';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // X labels every 5 days
+  ctx.fillStyle = 'rgba(107,114,128,0.9)';
+  ctx.font = '9px JetBrains Mono, monospace';
+  ctx.textAlign = 'center';
+  data.forEach((d, i) => {
+    if (d.d % 5 === 0 || d.d === 1) {
+      ctx.fillText(d.d, xOf(i), H - 4);
+    }
+  });
+
+  // Today dot
+  const now = ekatNow();
+  if (now.getFullYear() === year && now.getMonth() === month) {
+    const ti = now.getDate() - 1;
+    ctx.beginPath();
+    ctx.arc(xOf(ti), yOf(data[ti].dayLen), 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff6b35';
+    ctx.fill();
+  }
+}
+
+// ---- CALENDAR GRID ----
+function renderCalendar(data, year, month) {
+  const grid = document.getElementById('calGrid');
+  // Remove old day cells
+  while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+  const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0
+  for (let e = 0; e < firstDow; e++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  const now = ekatNow();
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() === month;
+  const maxLen = Math.max(...data.map(d => d.dayLen));
+
+  data.forEach(({ d, sr, ss, dayLen }) => {
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    if (isCurrentMonth && d === now.getDate()) el.classList.add('today');
+
+    const barW = Math.round((dayLen / maxLen) * 100);
+
+    el.innerHTML = `
+      <div class="cal-num">${d}</div>
+      <div class="cal-sr">${fmtTime(sr)}</div>
+      <div class="cal-ss">${fmtTime(ss)}</div>
+      <div class="cal-len">${fmtDuration(dayLen)}</div>
+      <div class="cal-bar" style="width:${barW}%"></div>
+    `;
+
+    el.addEventListener('mouseenter', e => showTooltip(e, d, month, year, sr, ss, dayLen));
+    el.addEventListener('mousemove', e => moveTooltip(e));
+    el.addEventListener('mouseleave', hideTooltip);
+    el.addEventListener('click', () => {
+      document.querySelectorAll('.cal-day.selected').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+    });
+
+    grid.appendChild(el);
+  });
+}
+
+// ---- TOOLTIP ----
+const tooltip = document.getElementById('tooltip');
+function showTooltip(e, d, month, year, sr, ss, dayLen) {
+  const p = getPeriods(sr, ss);
+  tooltip.innerHTML = `
+    <div class="tooltip-date">${d} ${MONTHS_GEN[month]} ${year}</div>
+    <div class="tooltip-row"><span>🌅 Восход</span><span>${fmtTime(sr)}</span></div>
+    <div class="tooltip-row"><span>🌇 Закат</span><span>${fmtTime(ss)}</span></div>
+    <div class="tooltip-row"><span>☀️ День</span><span>${fmtDuration(dayLen)}</span></div>
+    <div class="tooltip-row"><span>🌅 Утро</span><span>${fmtDuration(p.morning)}</span></div>
+    <div class="tooltip-row"><span>☀️ День</span><span>${fmtDuration(p.day)}</span></div>
+    <div class="tooltip-row"><span>🌆 Вечер</span><span>${fmtDuration(p.evening)}</span></div>
+    <div class="tooltip-row"><span>🌙 Ночь</span><span>${fmtDuration(p.night)}</span></div>
+  `;
+  tooltip.classList.add('visible');
+  moveTooltip(e);
+}
+function moveTooltip(e) {
+  let x = e.clientX + 14, y = e.clientY - 10;
+  if (x + 170 > window.innerWidth) x = e.clientX - 180;
+  tooltip.style.left = x + 'px'; tooltip.style.top = y + 'px';
+}
+function hideTooltip() { tooltip.classList.remove('visible'); }
+
+// ---- INIT ----
+buildSelectors();
+updateClock();
+updateTodayStats();
+
+const now0 = ekatNow();
+renderMonth(now0.getFullYear(), now0.getMonth());
+
+document.getElementById('selMonth').addEventListener('change', function() {
+  renderMonth(+document.getElementById('selYear').value, +this.value);
+});
+document.getElementById('selYear').addEventListener('change', function() {
+  renderMonth(+this.value, +document.getElementById('selMonth').value);
+});
+document.getElementById('btnCal').addEventListener('click', () => {
+  const n = ekatNow();
+  document.getElementById('selMonth').value = n.getMonth();
+  document.getElementById('selYear').value  = n.getFullYear();
+  renderMonth(n.getFullYear(), n.getMonth());
+});
+
+setInterval(updateClock, 1000);
+setInterval(updateTodayStats, 60000);
+
+// Redraw chart on resize
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => renderMonth(selYear, selMonth), 200);
+});
+</script>
+</body>
+</html>
+
